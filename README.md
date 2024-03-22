@@ -1,8 +1,8 @@
-# FastAPI versioning with multiple host solutions
+# FastAPI CRUD with dynamic routers
 
 ## Introduction
 
-This is a simple example of how to use FastAPI with multiple host solutions. This is useful when you have a single API that needs to be deployed in multiple environments, such as development, staging, and production.
+This is a simple CRUD application using FastAPI. The application uses dynamic routers to create routes for each model in the database.
 
 ## How to run
 
@@ -11,13 +11,5 @@ First, install the dependencies:
 ```bash
 
 pip install -r requirements.txt
-
-```
-
-Then, run the application:
-
-```bash
-
-python main.py
 
 ```
