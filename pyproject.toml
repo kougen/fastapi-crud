@@ -1,0 +1,32 @@
+[project]
+name = "fastapi-crud"
+version = "3.1.0" 
+authors = [
+  { name="kougen", email="info@kou-gen.net" },
+]
+
+maintainers = [
+  { name="Joshua Hegedus", email="josh.hegedus@outlook.com" },
+]
+
+description = "FastAPI CRUD generator"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+  'fastapi',
+  'uvicorn',
+]
+
+[project.urls]
+Homepage = "https://github.com/kougen/fastapi-crud"
+Issues = "https://github.com/kougen/fastapi-crud/issues"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
