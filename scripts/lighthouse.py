@@ -11,7 +11,7 @@ from pyrepositories import JsonTable, DataSource, Entity, IdTypes
 path_root = Path(__file__).parents[1]
 sys.path.append(os.path.join(path_root, 'src'))
 
-from fastapi_crud import CRUDApi, Model, EntityFactory
+from crud import CRUDApi, Model, EntityFactory
 
 
 class Organizer(Model):
@@ -67,7 +67,7 @@ class EventEntity(Entity):
 
 app = FastAPI()
 
-ds = DataSource(auto_increment=True, id_type=IdTypes.UUID)
+ds = DataSource(id_type=IdTypes.UUID)
 t = JsonTable("event", os.path.join(path_root, "data"))
 filters = { "date": (str, ""), "organizer": (str, ""), "status": (str, ""), "event_type": (str, ""), } 
 t.set_filter_fields(filters)
