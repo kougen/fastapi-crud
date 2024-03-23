@@ -50,64 +50,65 @@ class CRUDApiRouter:
         filters = table.get_filter_fields()
         base_path = f'/{datatype}'
 
-        self.router = APIRouter(
+        self.__router = APIRouter(
             prefix=get_prefix(datatype, use_prefix)
         )
 
-        @self.router.get(construct_path(f'{base_path}', '', True, use_prefix), tags=tags)
+        @self.__router.get(construct_path(f'{base_path}', '', True, use_prefix), tags=tags)
         async def read_items():
             return format_entities(self.datasource.get_all(datatype) or [])
 
-        @self.router.get(construct_path(f'{base_path}', '/filter', True, use_prefix), tags=tags)
+        @self.__router.get(construct_path(f'{base_path}', '/filter', True, use_prefix), tags=tags)
         async def filter_items(params: create_model("Query", **filters) = Depends()):
             fields = params.dict()
             return format_entities(self.datasource.get_by_filter(datatype, fields) or [])
 
-        @self.router.get(construct_path(base_path, id_path, False, use_prefix), tags=tags)
+        @self.__router.get(construct_path(base_path, id_path, False, use_prefix), tags=tags)
         async def read_item(id: int | str):
             return self.datasource.get_by_id(datatype, id)
 
-        @self.router.post(construct_path(base_path, '', False, use_prefix), tags=tags)
+        @self.__router.post(construct_path(base_path, '', False, use_prefix), tags=tags)
         async def create_item(item: model_type):
             return self.datasource.insert(datatype, factory.create_entity(item.model_dump()))
 
-        @self.router.put(construct_path(base_path, id_path, False, use_prefix), tags=tags)
+        @self.__router.put(construct_path(base_path, id_path, False, use_prefix), tags=tags)
         async def update_item(id: int | str, item: model_type):
             entity = factory.create_entity(item.model_dump())
             if isinstance(id, str) and convert2int(id):
                 id = int(id)
             return self.datasource.update(datatype, id, entity)
 
-        @self.router.delete(construct_path(base_path, id_path, False, use_prefix), tags=tags)
+        @self.__router.delete(construct_path(base_path, id_path, False, use_prefix), tags=tags)
         async def delete_item(id: int | str):
             if isinstance(id, str) and convert2int(id):
                 id = int(id)
             return self.datasource.delete(datatype, id)
 
-        @self.router.delete(construct_path(base_path, '', True, use_prefix), tags=tags)
+        @self.__router.delete(construct_path(base_path, '', True, use_prefix), tags=tags)
         async def delete_all_items():
             return self.datasource.clear(datatype)
 
-    def get_router(self):
-        return self.router
+    def get_base(self):
+        return self.__router
 
 
 class CRUDApi:
     def __init__(self, datasource: DataSource, app: FastAPI):
         self.datasource = datasource
-        self.app = app # type: FastAPI
-        self.routers = {} # type: dict[str, CRUDApiRouter]
+        self.__app = app # type: FastAPI
+        self.__routers = {} # type: dict[str, CRUDApiRouter]
 
     def get_app(self) -> FastAPI:
-        return self.app
+        return self.__app
 
     def get_routers(self):
-        return self.routers
+        return self.__routers
 
     def get_router(self, datatype: str) -> CRUDApiRouter | None:
-        return self.routers.get(datatype)
+        return self.__routers.get(datatype)
 
-    def add_router(self, datatype: str, model_type: type, factory: EntityFactory = EntityFactory(), use_prefix: bool = True):
+    def add_router(self, datatype: str, model_type: type, factory: EntityFactory = EntityFactory(), use_prefix: bool = True) -> CRUDApiRouter:
         router = CRUDApiRouter(self.datasource, datatype, model_type, factory, use_prefix)
-        self.routers[datatype] = router
-        self.app.include_router(router.get_router())
+        self.__routers[datatype] = router
+        self.__app.include_router(router.get_base())
+        return router
