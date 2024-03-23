@@ -95,11 +95,19 @@ class CRUDApiRouter:
 class CRUDApi:
     def __init__(self, datasource: DataSource, app: FastAPI):
         self.datasource = datasource
-        self.app = app
-        self.routers = [] # List[CRUDApiRouter]
+        self.app = app # type: FastAPI
+        self.routers = {} # type: dict[str, CRUDApiRouter]
 
+    def get_app(self) -> FastAPI:
+        return self.app
+
+    def get_routers(self):
+        return self.routers
+
+    def get_router(self, datatype: str) -> CRUDApiRouter | None:
+        return self.routers.get(datatype)
 
     def add_router(self, datatype: str, model_type: type, factory: EntityFactory = EntityFactory(), use_prefix: bool = True):
         router = CRUDApiRouter(self.datasource, datatype, model_type, factory, use_prefix)
-        self.routers.append(router)
+        self.routers[datatype] = router
         self.app.include_router(router.get_router())
