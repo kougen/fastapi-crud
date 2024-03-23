@@ -1,6 +1,6 @@
 [project]
 name = "fastapi-crud"
-version = "3.1.0" 
+version = "1.0.0" 
 authors = [
   { name="kougen", email="info@kou-gen.net" },
 ]
@@ -21,6 +21,7 @@ classifiers = [
 dependencies = [
   'fastapi',
   'uvicorn',
+  'pyrepositories',
 ]
 
 [project.urls]
