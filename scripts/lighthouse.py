@@ -75,7 +75,14 @@ t.set_filter_fields(filters)
 ds.add_table(t)
 api = CRUDApi(ds, app)
 
-api.add_router("event" , Event)
+router = api.register_router("event" , Event).get_base()
+
+@router.get("/test", tags=["event"])
+def test():
+    return "test"
+
+api.publish()
+
 
 
 if __name__ == "__main__":
