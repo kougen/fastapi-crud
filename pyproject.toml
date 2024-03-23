@@ -1,6 +1,6 @@
 [project]
 name = "kougen-fastapi-crud"
-version = "1.2.1" 
+version = "1.3.0" 
 authors = [
   { name="kougen", email="info@kou-gen.net" },
 ]
