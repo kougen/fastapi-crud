@@ -1,5 +1,5 @@
 [project]
-name = "api-crud"
+name = "kougen-fastapi-crud"
 version = "1.0.0" 
 authors = [
   { name="kougen", email="info@kou-gen.net" },
