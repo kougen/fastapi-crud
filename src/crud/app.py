@@ -27,6 +27,14 @@ def get_prefix(name: str, use_prefix: bool) -> str:
 def format_entities(entities: List[Entity]) -> List[dict]:
     return [entity.serialize() for entity in entities]
 
+def convert2int(value: str) -> bool:
+    try:
+        int(value)
+        return True
+    except ValueError:
+        return False
+
+
 class CRUDApiRouter:
     def __init__(self, datasource: DataSource, name: str, model_type: type, factory: EntityFactory, use_prefix: bool = True, use_name_as_tag: bool = True):
         self.datasource = datasource
@@ -66,10 +74,14 @@ class CRUDApiRouter:
         @self.router.put(construct_path(base_path, id_path, False, use_prefix), tags=tags)
         async def update_item(id: int | str, item: model_type):
             entity = factory.create_entity(item.model_dump())
+            if isinstance(id, str) and convert2int(id):
+                id = int(id)
             return self.datasource.update(datatype, id, entity)
 
         @self.router.delete(construct_path(base_path, id_path, False, use_prefix), tags=tags)
         async def delete_item(id: int | str):
+            if isinstance(id, str) and convert2int(id):
+                id = int(id)
             return self.datasource.delete(datatype, id)
 
         @self.router.delete(construct_path(base_path, '', True, use_prefix), tags=tags)
@@ -91,8 +103,3 @@ class CRUDApi:
         router = CRUDApiRouter(self.datasource, datatype, model_type, factory, use_prefix)
         self.routers.append(router)
         self.app.include_router(router.get_router())
-
-        
-
-
-
