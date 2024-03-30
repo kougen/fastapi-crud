@@ -24,4 +24,24 @@ First, install the dependencies:
 
 pip install -r requirements.txt
 
+app = FastAPI()
+
+ds = DataSource(id_type=IdTypes.UUID)
+
+api = CRUDApi(ds, app)
+
+# Registering a router will only setup the route without including it to the app, hence you can add custom endpoints to the router
+router = api.register_router("event" , Event).get_base()
+
+# You can add custom routes to the router
+@router.get("/test", tags=["event"])
+def test():
+    return "test"
+
+# You should call this function after all routes are defined to make sure the routes are registered
+api.publish()
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=1112)
 ```
