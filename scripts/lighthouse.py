@@ -1,17 +1,18 @@
 import os
 import sys
 from pathlib import Path
-from fastapi import FastAPI, Query
-from pydantic import BaseModel
-import uvicorn
+from fastapi import FastAPI
+from fastapi.security import OAuth2PasswordBearer
 from typing import List, Optional
 from pyrepositories import JsonTable, DataSource, Entity, IdTypes, FieldBase, FieldKeyTypes, FieldTypes
 
+from pyrepositories import JsonTable, DataSource, Entity, IdTypes
+import uvicorn
 
 path_root = Path(__file__).parents[1]
 sys.path.append(os.path.join(path_root, 'src'))
 
-from crud import CRUDApi, Model, EntityFactory
+from crud import CRUDApi, Model, EntityFactory, AuthConfig, UserEntity
 
 
 class Organizer(Model):
@@ -67,6 +68,18 @@ class EventEntity(Entity):
 
 app = FastAPI()
 
+def get_dummy_users_db():
+    tbl = JsonTable("users", os.path.join(path_root, "data"))
+    tbl.clear()
+    tbl.set_filter_fields({ "username": (str, ""), "email": (str, ""), "full_name": (str, ""), "disabled": (bool, False) })
+    users = []
+    users.append(UserEntity("jonhdoe", "john@doe.com", "John Doe"))
+    users.append(UserEntity("janedoe", "jane@doe.com", "Jane Doe"))
+    for user in users:
+        tbl.insert(user)
+
+    return tbl
+
 ds = DataSource(id_type=IdTypes.UUID)
 
 fields = [
@@ -88,7 +101,7 @@ filters = [
 # filters = { "date": (str, ""), "organizer": (str, ""), "status": (str, ""), "event_type": (str, ""), } 
 
 ds.add_table(t)
-api = CRUDApi(ds, app)
+api = CRUDApi(ds, app, authConfig)
 
 router = api.register_router("event" , Event, filters=filters).get_base()
 
