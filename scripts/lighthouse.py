@@ -12,7 +12,7 @@ import uvicorn
 path_root = Path(__file__).parents[1]
 sys.path.append(os.path.join(path_root, 'src'))
 
-from crud import CRUDApi, Model, EntityFactory, AuthConfig, UserEntity
+from crud import CRUDApi, Model, EntityFactory, AuthConfig, UserEntity, USER_FIELDS
 
 
 class Organizer(Model):
@@ -35,7 +35,7 @@ class Event(Model):
 class EventEntity(Entity):
     @property
     def date(self):
-        self.get_field("date")
+        return self.get_field("date")
     @date.setter
     def date(self, value):
         self.set_field_value("date", value)
@@ -69,9 +69,9 @@ class EventEntity(Entity):
 app = FastAPI()
 
 def get_dummy_users_db():
-    tbl = JsonTable("users", os.path.join(path_root, "data"))
+    tbl = JsonTable("users", os.path.join(path_root, "data"), USER_FIELDS)
     tbl.clear()
-    tbl.set_filter_fields({ "username": (str, ""), "email": (str, ""), "full_name": (str, ""), "disabled": (bool, False) })
+    # tbl.set_filter_fields({ "username": (str, ""), "email": (str, ""), "full_name": (str, ""), "disabled": (bool, False) })
     users = []
     users.append(UserEntity("jonhdoe", "john@doe.com", "John Doe"))
     users.append(UserEntity("janedoe", "jane@doe.com", "Jane Doe"))
