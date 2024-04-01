@@ -1,6 +1,8 @@
+from click.core import F
 from pydantic import BaseModel
-from pyrepositories import IdTypes, DataTable, Entity
+from pyrepositories import IdTypes, DataTable, Entity, FieldBase, FieldTypes, FieldKeyTypes
 from fastapi.security import OAuth2PasswordBearer
+
 
 class Model(BaseModel):
     pass
