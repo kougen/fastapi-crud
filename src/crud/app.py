@@ -3,7 +3,7 @@ from enum import Enum
 from fastapi import Depends, FastAPI
 from pyrepositories import DataSource, Entity, FieldBase, FieldTypes
 from fastapi import Depends, FastAPI, HTTPException, status
-from pyrepositories import DataSource, Entity
+from pyrepositories import DataSource, Entity, EntityField
 from pydantic import create_model
 from fastapi.routing import APIRouter
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -93,45 +93,60 @@ class CRUDApiRouter:
     def __setup_routes_with_auth(self, base_path: str, tags: List[str | Enum] | None, datatype: str, model_type: type, factory: EntityFactory, use_prefix: bool):
         if not self.__table:
             raise ValueError(f'Table {datatype} not found in datasource')
-        filters = self.__table.get_filter_fields()
+
+        if not self.__auth:
+            raise ValueError('Auth config is required for this route')
+
+        fields = self.__table.fields
+        filters = { name: (field.field_type, field.default) for name, field in fields.items()}
+        entity_fields = []
+        for field in self.__table.field_structure:
+            entity_fields.append(EntityField(field))
+
         @self.__router.get(construct_path(f'{base_path}', '', True, use_prefix), tags=tags)
-        async def read_items(token: Annotated[str, Depends(self.__auth)]):
+        async def read_items(token: Annotated[str, Depends(self.__auth.oauth2_scheme)]):
             return format_entities(self.__datasource.get_all(datatype) or [])
 
         @self.__router.get(construct_path(f'{base_path}', '/filter', True, use_prefix), tags=tags)
-        async def filter_items(token: Annotated[str, Depends(self.__auth)], params: create_model("Query", **filters) = Depends()):
+        async def filter_items(token: Annotated[str, Depends(self.__auth.oauth2_scheme)], params: create_model("Query", **filters) = Depends()):
             fields = params.dict()
             return format_entities(self.__datasource.get_by_filter(datatype, fields) or [])
 
         @self.__router.get(construct_path(base_path, id_path, False, use_prefix), tags=tags)
-        async def read_item(token: Annotated[str, Depends(self.__auth)], id: int | str):
+        async def read_item(token: Annotated[str, Depends(self.__auth.oauth2_scheme)], id: int | str):
             return self.__datasource.get_by_id(datatype, id)
 
         @self.__router.post(construct_path(base_path, '', False, use_prefix), tags=tags)
-        async def create_item(token: Annotated[str, Depends(self.__auth)], item: model_type):
-            return self.__datasource.insert(datatype, factory.create_entity(item.model_dump()))
+        async def create_item(token: Annotated[str, Depends(self.__auth.oauth2_scheme)], item: model_type):
+            return self.__datasource.insert(datatype, factory.create_entity(entity_fields))
 
         @self.__router.put(construct_path(base_path, id_path, False, use_prefix), tags=tags)
-        async def update_item(token: Annotated[str, Depends(self.__auth)], id: int | str, item: model_type):
-            entity = factory.create_entity(item.model_dump())
+        async def update_item(token: Annotated[str, Depends(self.__auth.oauth2_scheme)], id: int | str, item: model_type):
+            entity = factory.create_entity(entity_fields)
             if isinstance(id, str) and convert2int(id):
                 id = int(id)
             return self.__datasource.update(datatype, id, entity)
 
         @self.__router.delete(construct_path(base_path, id_path, False, use_prefix), tags=tags)
-        async def delete_item(token: Annotated[str, Depends(self.__auth)], id: int | str):
+        async def delete_item(token: Annotated[str, Depends(self.__auth.oauth2_scheme)], id: int | str):
             if isinstance(id, str) and convert2int(id):
                 id = int(id)
             return self.__datasource.delete(datatype, id)
 
         @self.__router.delete(construct_path(base_path, '', True, use_prefix), tags=tags)
-        async def delete_all_items(token: Annotated[str, Depends(self.__auth)]):
+        async def delete_all_items(token: Annotated[str, Depends(self.__auth.oauth2_scheme)]):
             return self.__datasource.clear(datatype)
 
     def __setup_routes(self, base_path: str, tags: List[str | Enum] | None, datatype: str, model_type: type, factory: EntityFactory, use_prefix: bool):
         if not self.__table:
             raise ValueError(f'Table {datatype} not found in datasource')
-        filters = self.__table.get_filter_fields()
+
+        fields = self.__table.fields
+        filters = { name: (field.field_type, field.default) for name, field in fields.items()}
+        entity_fields = []
+        for field in self.__table.field_structure:
+            entity_fields.append(EntityField(field))
+
         @self.__router.get(construct_path(f'{base_path}', '', True, use_prefix), tags=tags)
         async def read_items():
             return format_entities(self.__datasource.get_all(datatype) or [])
@@ -209,7 +224,7 @@ class CRUDApi:
         globalAuth = self.__auth
 
         def get_user(username: str):
-            return globalAuth.users_db.get_by_filter({"username": username})
+            return globalAuth.users_db.get_unique('username', username)
 
 
         def fake_decode_token(token: str):
@@ -241,7 +256,7 @@ class CRUDApi:
 
         @self.__app.post("/token", tags=["auth"])
         async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
-            results = globalAuth.users_db.get_by_filter({"username": form_data.username})
+            results = globalAuth.users_db.get_unique('username', form_data.username)
             if len(results) != 1:
                 raise HTTPException(status_code=400, detail="Incorrect username or password")
             user = results[0]
