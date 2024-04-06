@@ -36,51 +36,59 @@ class EventEntity(Entity):
     @property
     def date(self):
         return self.get_field("date")
+
     @date.setter
     def date(self, value):
         self.set_field_value("date", value)
+
     @property
     def organizer(self):
         return self.get_field("organizer")
+
     @organizer.setter
     def organizer(self, value):
         self.set_field_value("organizer", value)
+
     @property
     def status(self):
         return self.get_field("status")
+
     @status.setter
     def status(self, value):
         self.set_field_value("status", value)
+
     @property
     def max_attendees(self):
         return self.get_field("max_attendees")
+
     @max_attendees.setter
     def max_attendees(self, value):
         self.set_field_value("max_attendees", value)
+
     @property
     def joiners(self):
         return self.get_field("joiners")
+
     @joiners.setter
     def joiners(self, value):
         self.set_field_value("joiners", value)
 
 
-
 app = FastAPI()
 
-def get_dummy_users_db():
+
+def get_dummy_users_db(datasource: DataSource):
     tbl = JsonTable("users", os.path.join(path_root, "data"), USER_FIELDS)
     tbl.clear()
-    # tbl.set_filter_fields({ "username": (str, ""), "email": (str, ""), "full_name": (str, ""), "disabled": (bool, False) })
-    users = []
-    users.append(UserEntity("jonhdoe", "john@doe.com", "John Doe"))
-    users.append(UserEntity("janedoe", "jane@doe.com", "Jane Doe"))
-    for user in users:
-        tbl.insert(user)
+    users = [UserEntity("jonhdoe", "john@doe.com", "John Doe"), UserEntity("janedoe", "jane@doe.com", "Jane Doe")]
+    datasource.add_table(tbl)
 
-    return tbl
+    for user in users:
+        datasource.insert("users", user)
+
 
 ds = DataSource(id_type=IdTypes.UUID)
+authConfig = AuthConfig(get_dummy_users_db(ds), OAuth2PasswordBearer(tokenUrl="token"))
 
 fields = [
     FieldBase("date", FieldTypes.STR, FieldKeyTypes.PRIMARY),
@@ -103,14 +111,15 @@ filters = [
 ds.add_table(t)
 api = CRUDApi(ds, app, authConfig)
 
-router = api.register_router("event" , Event, filters=filters).get_base()
+router = api.register_router("event", Event, filters=filters).get_base()
+
 
 @router.get("/test", tags=["event"])
 def test():
     return "test"
 
-api.publish()
 
+api.publish()
 
 
 if __name__ == "__main__":
