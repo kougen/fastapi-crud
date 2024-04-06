@@ -4,3 +4,4 @@ fastapi
 uvicorn
 jsonservice
 pyrepositories
+python-multipart
