@@ -1,10 +1,11 @@
 from typing import List
 from enum import Enum
 from fastapi import Depends, FastAPI
-from pyrepositories import DataSource, Entity
+from pyrepositories import DataSource, Entity, FieldBase, FieldTypes
 from pydantic import create_model
 from fastapi.routing import APIRouter
 from .entities import EntityFactory
+from .lib import convert_field_to_filter
 
 id_path = '/single/{id}'
 
@@ -27,6 +28,7 @@ def get_prefix(name: str, use_prefix: bool) -> str:
 def format_entities(entities: List[Entity]) -> List[dict]:
     return [entity.serialize() for entity in entities]
 
+
 def convert2int(value: str) -> bool:
     try:
         int(value)
@@ -36,7 +38,7 @@ def convert2int(value: str) -> bool:
 
 
 class CRUDApiRouter:
-    def __init__(self, datasource: DataSource, name: str, model_type: type, factory: EntityFactory, use_prefix: bool = True, use_name_as_tag: bool = True):
+    def __init__(self, datasource: DataSource, name: str, model_type: type, factory: EntityFactory, use_prefix: bool = True, use_name_as_tag: bool = True, filters: list[FieldBase] = []):
         self.__datasource = datasource
         self.__is_included = False
         self.name = name
@@ -48,7 +50,6 @@ class CRUDApiRouter:
         if not table:
             raise ValueError(f'Table {datatype} not found in datasource')
 
-        filters = table.get_filter_fields()
         base_path = f'/{datatype}'
 
         self.__router = APIRouter(
@@ -58,11 +59,14 @@ class CRUDApiRouter:
         @self.__router.get(construct_path(f'{base_path}', '', True, use_prefix), tags=tags)
         async def read_items():
             return format_entities(self.__datasource.get_all(datatype) or [])
+        
+        if len(filters) > 0:
+            filter_dict = convert_field_to_filter(filters)
 
-        @self.__router.get(construct_path(f'{base_path}', '/filter', True, use_prefix), tags=tags)
-        async def filter_items(params: create_model("Query", **filters) = Depends()):
-            fields = params.dict()
-            return format_entities(self.__datasource.get_by_filter(datatype, fields) or [])
+            @self.__router.get(construct_path(f'{base_path}', '/filter', True, use_prefix), tags=tags)
+            async def filter_items(params: create_model("Query", **filter_dict) = Depends()):
+                fields = params.dict()
+                return format_entities(self.__datasource.get_by_filter(datatype, fields) or [])
 
         @self.__router.get(construct_path(base_path, id_path, False, use_prefix), tags=tags)
         async def read_item(id: int | str):
@@ -70,20 +74,39 @@ class CRUDApiRouter:
 
         @self.__router.post(construct_path(base_path, '', False, use_prefix), tags=tags)
         async def create_item(item: model_type):
-            return self.__datasource.insert(datatype, factory.create_entity(item.model_dump()))
+            try:
+                entity = factory.create_entity(table.field_structure, item.model_dump())
+                result = self.__datasource.insert(datatype, entity)
+                if result:
+                    return {'success': True, 'created_entity': result.serialize()}
+                else:
+                    return {'success': False}
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
 
         @self.__router.put(construct_path(base_path, id_path, False, use_prefix), tags=tags)
-        async def update_item(id: int | str, item: model_type):
-            entity = factory.create_entity(item.model_dump())
-            if isinstance(id, str) and convert2int(id):
-                id = int(id)
-            return self.__datasource.update(datatype, id, entity)
+        async def update_item(item_id: int | str, item: model_type):
+            try:
+                entity = factory.create_entity(table.field_structure, item.model_dump())
+                if isinstance(item_id, str) and convert2int(item_id):
+                    item_id = int(item_id)
+                result = self.__datasource.update(datatype, item_id, entity)
+                if result:
+                    return {'success': True, 'updated_entity': result.serialize()}
+                return {'success': False}
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
 
         @self.__router.delete(construct_path(base_path, id_path, False, use_prefix), tags=tags)
-        async def delete_item(id: int | str):
+        async def delete_item(item_id: int | str):
             if isinstance(id, str) and convert2int(id):
-                id = int(id)
-            return self.__datasource.delete(datatype, id)
+                try:
+                    if isinstance(item_id, str) and convert2int(item_id):
+                        item_id = int(item_id)
+                    result = self.__datasource.delete(datatype, int(item_id))
+                    return {'success': result}
+                except Exception as e:
+                    return {'success': False, 'error': str(e)}
 
         @self.__router.delete(construct_path(base_path, '', True, use_prefix), tags=tags)
         async def delete_all_items():
@@ -121,13 +144,13 @@ class CRUDApi:
     def get_datasource(self) -> DataSource:
         return self.__datasource
 
-    def register_router(self, datatype: str, model_type: type, factory: EntityFactory = EntityFactory(), use_prefix: bool = True) -> CRUDApiRouter:
-        router = CRUDApiRouter(self.__datasource, datatype, model_type, factory, use_prefix)
+    def register_router(self, datatype: str, model_type: type, factory: EntityFactory = EntityFactory(), use_prefix: bool = True, filters: list[FieldBase] = []) -> CRUDApiRouter:
+        router = CRUDApiRouter(self.__datasource, datatype, model_type, factory, use_prefix, filters=filters)
         self.__routers[datatype] = router
         return router
 
-    def include_router(self, datatype: str, model_type: type, factory: EntityFactory = EntityFactory(), use_prefix: bool = True) -> CRUDApiRouter:
-        router = self.register_router(datatype, model_type, factory, use_prefix)
+    def include_router(self, datatype: str, model_type: type, factory: EntityFactory = EntityFactory(), use_prefix: bool = True, filters: list[FieldBase] = []) -> CRUDApiRouter:
+        router = self.register_router(datatype, model_type, factory, use_prefix, filters)
         self.__app.include_router(router.get_base())
         router.include()
         return router
