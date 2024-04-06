@@ -1,17 +1,20 @@
 from pydantic import BaseModel
-from pyrepositories import Entity
+from pyrepositories import Entity, FieldBase, EntityField
 
 
 class EntityFactory:
-    def convert_model(self, model: BaseModel) -> Entity:
-        fields = model.model_dump()
-        if 'id' in fields:
-            entity = Entity(id=fields['id'])
-            entity.fields = fields
-        print("Override this method to create an entity")
-        return Entity()
+    @staticmethod
+    def convert_model(model: BaseModel, fields: list[FieldBase]) -> Entity:
+        entity_fields = []
+        data = model.model_dump()
+        for field in fields:
+            entity_fields.append(EntityField(field))
+        return Entity(entity_fields, id=data.get('id'))
 
-    def create_entity(self, fields: dict) -> Entity:
-        entity = Entity(fields.get('id'))
-        entity.fields = fields
-        return entity
+    @staticmethod
+    def create_entity(fields: list[FieldBase], data: dict) -> Entity:
+        entity_fields = []
+        for field in fields:
+            value = data.get(field.name)
+            entity_fields.append(EntityField(field, value))
+        return Entity(entity_fields)
