@@ -1,5 +1,6 @@
 from pydantic import BaseModel
-from pyrepositories import IdTypes, FieldBase, FieldTypes
+from pyrepositories import IdTypes, FieldBase, FieldTypes, Filter, FilterCondition, FilterCombination, FilterTypes
+
 
 class Model(BaseModel):
     pass
@@ -14,3 +15,12 @@ def convert_field_to_filter(fields: list[FieldBase]) -> dict:
             raise ValueError('Field type DICT is not supported')
         filter_dict[field.name] = (field.field_type.content_type, field.default)
     return filter_dict
+
+
+def convert_dict_to_filter(data: dict) -> Filter:
+    conditions = []
+
+    for key, value in data.items():
+        conditions.append(FilterCondition(key, value, FilterTypes.CONTAINS))
+
+    return Filter(conditions, FilterCombination.AND)
