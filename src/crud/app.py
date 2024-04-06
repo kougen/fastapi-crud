@@ -5,9 +5,10 @@ from pyrepositories import DataSource, Entity, FieldBase, FieldTypes
 from pydantic import create_model
 from fastapi.routing import APIRouter
 from .entities import EntityFactory
-from .lib import convert_field_to_filter
+from .lib import convert_field_to_filter, convert_dict_to_filter
 
 id_path = '/single/{id}'
+
 
 def construct_path(base_path: str, path: str, is_plural: bool, use_prefix: bool) -> str:
     plural = 's' if is_plural else ''
@@ -66,7 +67,9 @@ class CRUDApiRouter:
             @self.__router.get(construct_path(f'{base_path}', '/filter', True, use_prefix), tags=tags)
             async def filter_items(params: create_model("Query", **filter_dict) = Depends()):
                 fields = params.dict()
-                return format_entities(self.__datasource.get_by_filter(datatype, fields) or [])
+                processed_filters = convert_dict_to_filter(fields)
+                result = format_entities(self.__datasource.get_by_filter(datatype, processed_filters) or [])
+                return result
 
         @self.__router.get(construct_path(base_path, id_path, False, use_prefix), tags=tags)
         async def read_item(id: int | str):
@@ -99,14 +102,15 @@ class CRUDApiRouter:
 
         @self.__router.delete(construct_path(base_path, id_path, False, use_prefix), tags=tags)
         async def delete_item(item_id: int | str):
-            if isinstance(id, str) and convert2int(id):
-                try:
-                    if isinstance(item_id, str) and convert2int(item_id):
-                        item_id = int(item_id)
-                    result = self.__datasource.delete(datatype, int(item_id))
-                    return {'success': result}
-                except Exception as e:
-                    return {'success': False, 'error': str(e)}
+            try:
+                if isinstance(item_id, str) and convert2int(item_id):
+                    item_id = int(item_id)
+                result = self.__datasource.delete(datatype, item_id)
+                if result:
+                    return {'success': True, 'deleted_id': item_id}
+                return {'success': False}
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
 
         @self.__router.delete(construct_path(base_path, '', True, use_prefix), tags=tags)
         async def delete_all_items():
