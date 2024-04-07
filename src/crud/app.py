@@ -148,6 +148,9 @@ class CRUDApiRouter:
         if not self.__auth:
             raise ValueError('Auth config is required for this route')
 
+        global_auth = self.__auth
+        setup_routes_with_auth(self.__router, base_path, datatype, self.__datasource, model_type, factory, use_prefix, global_auth.oauth2_scheme, self.__filters, tags)
+
     def __setup_routes(self, base_path: str, tags: List[str | Enum] | None, datatype: str, model_type: type,
                        factory: EntityFactory, use_prefix: bool):
         if not self.__table:
@@ -289,7 +292,7 @@ class CRUDApi:
         if filters is None:
             filters = []
 
-        router = CRUDApiRouter(self.__datasource, datatype, model_type, factory, use_prefix, filters=filters)
+        router = CRUDApiRouter(self.__datasource, datatype, model_type, factory, use_prefix, auth=self.__auth, filters=filters)
         self.__routers[datatype] = router
         return router
 
@@ -297,7 +300,7 @@ class CRUDApi:
                        use_prefix: bool = True, filters: list[FieldBase] = None) -> CRUDApiRouter:
         if filters is None:
             filters = []
-        router = self.register_router(datatype, model_type, factory, use_prefix, filters)
+        router = self.register_router(datatype, model_type, factory, use_prefix, filters=filters)
         self.__app.include_router(router.get_base())
         router.include()
         return router
