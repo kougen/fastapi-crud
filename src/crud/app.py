@@ -9,7 +9,6 @@ from fastapi.routing import APIRouter
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from .entities import EntityFactory
 from .lib import convert_field_to_filter, convert_dict_to_filter
-from .lib import AuthConfig, decode_token, User
 
 id_path = '/single/{id}'
 
@@ -42,55 +41,6 @@ def convert2int(value: str) -> bool:
         return False
 
 
-def setup_routes_with_auth(router, base_path: str, datatype: str, datasource: DataSource, model_type: type,
-        factory: EntityFactory, use_prefix: bool, auth_scheme: OAuth2PasswordBearer, filters: list[FieldBase] | None = None,
-                           tags: List[str | Enum] | None = None):
-    table = datasource.get_table(datatype)
-    if not table:
-        raise ValueError(f'Table {datatype} not found in datasource')
-
-    @router.get(construct_path(f'{base_path}', '', True, use_prefix), tags=tags)
-    async def read_items(token: Annotated[str, Depends(auth_scheme)]):
-        return format_entities(datasource.get_all(datatype) or [])
-
-    if len(filters) > 0:
-        filter_dict = convert_field_to_filter(filters)
-
-        @router.get(construct_path(f'{base_path}', '/filter', True, use_prefix), tags=tags)
-        async def filter_items(token: Annotated[str, Depends(auth_scheme)],
-                               params: create_model("Query", **filter_dict) = Depends()):
-            fields = params.dict()
-            processed_filters = convert_dict_to_filter(fields)
-            result = format_entities(datasource.get_by_filter(datatype, processed_filters) or [])
-            return result
-
-    @router.get(construct_path(base_path, id_path, False, use_prefix), tags=tags)
-    async def read_item(token: Annotated[str, Depends(auth_scheme)], id: int | str):
-        return datasource.get_by_id(datatype, id)
-
-    @router.post(construct_path(base_path, '', False, use_prefix), tags=tags)
-    async def create_item(token: Annotated[str, Depends(auth_scheme)], item: model_type):
-        return datasource.insert(datatype, factory.create_entity(table.field_structure, item.model_dump()))
-
-    @router.put(construct_path(base_path, id_path, False, use_prefix), tags=tags)
-    async def update_item(token: Annotated[str, Depends(auth_scheme)], id: int | str,
-                          item: model_type):
-        entity = factory.create_entity(table.field_structure, item.model_dump())
-        if isinstance(id, str) and convert2int(id):
-            id = int(id)
-        return datasource.update(datatype, id, entity)
-
-    @router.delete(construct_path(base_path, id_path, False, use_prefix), tags=tags)
-    async def delete_item(token: Annotated[str, Depends(auth_scheme)], id: int | str):
-        if isinstance(id, str) and convert2int(id):
-            id = int(id)
-        return datasource.delete(datatype, id)
-
-    @router.delete(construct_path(base_path, '', True, use_prefix), tags=tags)
-    async def delete_all_items(token: Annotated[str, Depends(auth_scheme)]):
-        return datasource.clear(datatype)
-
-
 class CRUDApiRouter:
     def __init__(
             self,
@@ -100,7 +50,6 @@ class CRUDApiRouter:
             factory: EntityFactory,
             use_prefix: bool = True,
             use_name_as_tag: bool = True,
-            auth: AuthConfig | None = None,
             filters: list[FieldBase] | None = None
     ):
         self.__datasource = datasource
@@ -122,10 +71,7 @@ class CRUDApiRouter:
             prefix=get_prefix(datatype, use_prefix)
         )
 
-        if auth:
-            self.__setup_routes_with_auth(base_path, tags, datatype, model_type, factory, use_prefix)
-        else:
-            self.__setup_routes(base_path, tags, datatype, model_type, factory, use_prefix)
+        self.__setup_routes(base_path, tags, datatype, model_type, factory, use_prefix)
 
     def get_base(self):
         return self.__router
@@ -139,17 +85,6 @@ class CRUDApiRouter:
 
     def include(self):
         self.__is_included = True
-
-    def __setup_routes_with_auth(self, base_path: str, tags: List[str | Enum] | None, datatype: str, model_type: type,
-                                 factory: EntityFactory, use_prefix: bool):
-        if not self.__table:
-            raise ValueError(f'Table {datatype} not found in datasource')
-
-        if not self.__auth:
-            raise ValueError('Auth config is required for this route')
-
-        global_auth = self.__auth
-        setup_routes_with_auth(self.__router, base_path, datatype, self.__datasource, model_type, factory, use_prefix, global_auth.oauth2_scheme, self.__filters, tags)
 
     def __setup_routes(self, base_path: str, tags: List[str | Enum] | None, datatype: str, model_type: type,
                        factory: EntityFactory, use_prefix: bool):
@@ -217,11 +152,10 @@ class CRUDApiRouter:
 
 
 class CRUDApi:
-    def __init__(self, datasource: DataSource, app: FastAPI, auth: AuthConfig | None = None):
+    def __init__(self, datasource: DataSource, app: FastAPI):
         self.__datasource = datasource
         self.__app = app  # type: FastAPI
         self.__routers = {}  # type: dict[str, CRUDApiRouter]
-        self.__auth = auth
 
         if self.__auth:
             self.__setup_auth()
